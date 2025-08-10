@@ -13,6 +13,35 @@ namespace _2D_Fluid_Sim_GPU
     public class Shader
     {
         public int Handle;
+        public Shader(string computePath)
+        {
+            int computeShader = GL.CreateShader(ShaderType.ComputeShader);
+            string computeSource = File.ReadAllText(computePath);
+            GL.ShaderSource(computeShader, computeSource);
+            GL.CompileShader(computeShader);
+
+            int success;
+            GL.GetShader(computeShader, ShaderParameter.CompileStatus, out success);
+            if (success == 0)
+            {
+                string infoLog = GL.GetShaderInfoLog(computeShader);
+                Console.WriteLine(infoLog);
+            }
+
+            Handle = GL.CreateProgram();
+            GL.AttachShader(Handle, computeShader);
+            GL.LinkProgram(Handle);
+
+            GL.GetProgram(Handle, GetProgramParameterName.LinkStatus, out success);
+            if (success == 0)
+            {
+                string infoLog = GL.GetProgramInfoLog(Handle);
+                Console.WriteLine(infoLog);
+            }
+            GL.DetachShader(Handle, computeShader);
+            GL.DeleteShader(computeShader);
+        }
+
         public Shader(string vertexPath, string fragmentPath)
         {
             int VertexShader;

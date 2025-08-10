@@ -8,7 +8,7 @@ namespace _2D_Fluid_Sim_GPU
     {
         static void Main()
         {
-            using (Game game = new Game(800, 600, "2D Fluid Sim"))
+            using (Game game = new Game(800, 800, "2D Fluid Sim", 400, 400))
             {
                 game.Run();
             }

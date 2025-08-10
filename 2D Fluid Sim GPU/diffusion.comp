@@ -1,0 +1,29 @@
+﻿#version 430
+
+layout (local_size_x = 16, local_size_y = 16) in;
+
+layout(rg32f, binding = 0) readonly uniform image2D inputTex;
+layout(rg32f, binding = 1) writeonly uniform image2D outputTex;
+
+uniform float k;
+
+void main()
+{
+    ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 size = imageSize(inputTex);
+
+    if (pos.x <= 0 || pos.x >= size.x - 1 || pos.y <= 0 || pos.y >= size.y - 1)
+    {
+        imageStore(outputTex, pos, imageLoad(inputTex, pos));
+        return;
+    }
+
+    vec2 center = imageLoad(inputTex, pos).rg;
+    vec2 left = imageLoad(inputTex, pos + ivec2(-1, 0)).rg;
+    vec2 right = imageLoad(inputTex, pos + ivec2(1, 0)).rg;
+    vec2 up = imageLoad(inputTex, pos + ivec2(0, 1)).rg;
+    vec2 down = imageLoad(inputTex, pos + ivec2(0, -1)).rg;
+
+    vec2 result = (center + (k / 4.0) * (left + right + up + down)) / (1.0 + k);
+    imageStore(outputTex, pos, vec4(result, 0.0, 1.0));
+}

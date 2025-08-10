@@ -1,0 +1,30 @@
+#version 430
+
+layout (local_size_x = 16, local_size_y = 16) in;
+
+layout(r32f, binding = 0) readonly uniform image2D pressureTex;
+layout(r32f, binding = 1) readonly uniform image2D divergenceTex;
+layout(r32f, binding = 2) writeonly uniform image2D outputTex;
+
+void main()
+{
+    ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 size = imageSize(pressureTex);
+
+    if (pos.x <= 0 || pos.x >= size.x - 1 || pos.y <= 0 || pos.y >= size.y - 1)
+    {
+        float p = imageLoad(pressureTex, pos).r;
+        imageStore(outputTex, pos, vec4(p, 0.0, 0.0, 1.0));
+        return;
+    }
+
+    float left = imageLoad(pressureTex, pos + ivec2(-1, 0)).r;
+    float right = imageLoad(pressureTex, pos + ivec2(1, 0)).r;
+    float up = imageLoad(pressureTex, pos + ivec2(0, 1)).r;
+    float down = imageLoad(pressureTex, pos + ivec2(0, -1)).r;
+    float div = imageLoad(divergenceTex, pos).r;
+
+    float pNew = (left + right + up + down - div) * 0.25;
+
+    imageStore(outputTex, pos, vec4(pNew, 0.0, 0.0, 1.0));
+}
