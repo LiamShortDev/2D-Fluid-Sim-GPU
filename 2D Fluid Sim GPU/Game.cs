@@ -309,12 +309,13 @@ namespace _2D_Fluid_Sim_GPU
                 GL.BufferData(BufferTarget.ArrayBuffer, arrowVertices.Length * sizeof(float), arrowVertices, BufferUsageHint.DynamicDraw);
 
                 GL.BindVertexArray(arrowVAO);
-                GL.UseProgram(arrowShader.Handle);
+                arrowShader.Use();
 
-                GL.DrawArrays(PrimitiveType.Lines, 0, arrowVertices.Length / 2);
+                GL.DrawArrays(PrimitiveType.Lines, 0, arrowVertices.Length / 3);
 
                 GL.BindVertexArray(0);
             }
+
 
             SwapBuffers();
         }
@@ -369,11 +370,11 @@ namespace _2D_Fluid_Sim_GPU
                     Vector2 dir = v.Normalized();
 
                     float length = MathF.Min(mag * arrowScale, arrowScale * 5);
-
+                    length = arrowScale;
                     float endX = startX + dir.X * length;
                     float endY = startY + dir.Y * length;
 
-                    vertices.AddRange(new float[] { startX, startY, endX, endY });
+                    vertices.AddRange(new float[] { startX, startY, mag, endX, endY, mag });
                 }
             }
 
@@ -388,13 +389,20 @@ namespace _2D_Fluid_Sim_GPU
             arrowVBO = GL.GenBuffer();
             GL.BindBuffer(BufferTarget.ArrayBuffer, arrowVBO);
 
+            // Initialize with zero size (or small size) but expect 3 floats per vertex now
             GL.BufferData(BufferTarget.ArrayBuffer, 0, IntPtr.Zero, BufferUsageHint.DynamicDraw);
 
-            GL.VertexAttribPointer(0, 2, VertexAttribPointerType.Float, false, 2 * sizeof(float), 0);
+            // Position attribute (location = 0): 2 floats, offset 0, stride 3 floats
+            GL.VertexAttribPointer(0, 2, VertexAttribPointerType.Float, false, 3 * sizeof(float), 0);
             GL.EnableVertexAttribArray(0);
+
+            // Magnitude attribute (location = 1): 1 float, offset 2 floats
+            GL.VertexAttribPointer(1, 1, VertexAttribPointerType.Float, false, 3 * sizeof(float), 2 * sizeof(float));
+            GL.EnableVertexAttribArray(1);
 
             GL.BindVertexArray(0);
         }
+
 
         protected override void OnUnload()
         {
