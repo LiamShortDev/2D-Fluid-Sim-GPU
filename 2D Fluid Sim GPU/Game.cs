@@ -54,8 +54,12 @@ namespace _2D_Fluid_Sim_GPU
         }
 
         // Map simulation coordinate [0..maxCoord-1] to NDC [-1..1]
-        float ToNDC(int coord, int maxCoord) => (coord / (float)(maxCoord - 1)) * 2.0f - 1.0f;
-
+        Vector2 ToNDC(Vector2 pos)
+        {
+            float ndcX = (pos.X / (width - 1)) * 2f - 1f;
+            float ndcY = (pos.Y / (height - 1)) * 2f - 1f;
+            return new Vector2(ndcX, ndcY);
+        }
         protected override void OnLoad()
         {
             base.OnLoad();
@@ -303,15 +307,15 @@ namespace _2D_Fluid_Sim_GPU
 
             if (showArrows)
             {
-                float[] arrowVertices = GenerateArrowVertices(Sim.GetVelocities(), width, height);
+                float[] arrowVertices = GenerateFixedLengthArrowQuads(Sim.GetVelocities(), width, height, thickness: 2f);
 
                 GL.BindBuffer(BufferTarget.ArrayBuffer, arrowVBO);
                 GL.BufferData(BufferTarget.ArrayBuffer, arrowVertices.Length * sizeof(float), arrowVertices, BufferUsageHint.DynamicDraw);
 
                 GL.BindVertexArray(arrowVAO);
-                arrowShader.Use();
+                GL.UseProgram(arrowShader.Handle);
 
-                GL.DrawArrays(PrimitiveType.Lines, 0, arrowVertices.Length / 3);
+                GL.DrawArrays(PrimitiveType.Triangles, 0, arrowVertices.Length / 2);
 
                 GL.BindVertexArray(0);
             }
@@ -352,33 +356,47 @@ namespace _2D_Fluid_Sim_GPU
             }
         }
 
-        private float[] GenerateArrowVertices(Vector2[,] velocities, int w, int h, float arrowScale = 0.02f)
+        float[] GenerateFixedLengthArrowQuads(Vector2[,] velocities, int width, int height, float arrowLength = 8f, float thickness = 0.7f)
         {
-            List<float> vertices = new List<float>();
+            var verts = new List<float>();
+            float halfThickness = thickness / 2f;
 
-            for (int y = 0; y < h; y += 10)
+            for (int y = 0; y < height; y += 10)
             {
-                for (int x = 0; x < w; x += 10)
+                for (int x = 0; x < width; x += 10)
                 {
-                    Vector2 v = velocities[x, y];
-                    float startX = ToNDC(x, w);
-                    float startY = ToNDC(y, h);
+                    Vector2 start = new Vector2(x, y);
+                    Vector2 velocity = velocities[x, y];
 
-                    float mag = v.Length;
-                    if (mag < 0.01f) continue;
+                    if (velocity.LengthSquared < 0.0001f)
+                        continue;
 
-                    Vector2 dir = v.Normalized();
+                    Vector2 dir = velocity.Normalized();
+                    Vector2 end = start + dir * arrowLength;
+                    Vector2 normal = new Vector2(-dir.Y, dir.X);
+                    Vector2 offset = normal * halfThickness;
 
-                    float length = MathF.Min(mag * arrowScale, arrowScale * 5);
-                    length = arrowScale;
-                    float endX = startX + dir.X * length;
-                    float endY = startY + dir.Y * length;
+                    float mag = MathHelper.Clamp(velocity.Length, 0f, 1f);
 
-                    vertices.AddRange(new float[] { startX, startY, mag, endX, endY, mag });
+                    Vector2 v0 = ToNDC(start + offset);
+                    Vector2 v1 = ToNDC(end + offset);
+                    Vector2 v2 = ToNDC(end - offset);
+                    Vector2 v3 = ToNDC(start - offset);
+                    
+
+                    // Triangle 1
+                    verts.Add(v0.X); verts.Add(v0.Y); verts.Add(mag);
+                    verts.Add(v1.X); verts.Add(v1.Y); verts.Add(mag);
+                    verts.Add(v2.X); verts.Add(v2.Y); verts.Add(mag);
+
+                    // Triangle 2
+                    verts.Add(v0.X); verts.Add(v0.Y); verts.Add(mag);
+                    verts.Add(v2.X); verts.Add(v2.Y); verts.Add(mag);
+                    verts.Add(v3.X); verts.Add(v3.Y); verts.Add(mag);
                 }
             }
 
-            return vertices.ToArray();
+            return verts.ToArray();
         }
 
         void SetupArrowBuffers()
@@ -389,14 +407,15 @@ namespace _2D_Fluid_Sim_GPU
             arrowVBO = GL.GenBuffer();
             GL.BindBuffer(BufferTarget.ArrayBuffer, arrowVBO);
 
-            // Initialize with zero size (or small size) but expect 3 floats per vertex now
+            // No data now, dynamic update each frame
             GL.BufferData(BufferTarget.ArrayBuffer, 0, IntPtr.Zero, BufferUsageHint.DynamicDraw);
 
-            // Position attribute (location = 0): 2 floats, offset 0, stride 3 floats
+
+            // position attribute: 2 floats, offset 0
             GL.VertexAttribPointer(0, 2, VertexAttribPointerType.Float, false, 3 * sizeof(float), 0);
             GL.EnableVertexAttribArray(0);
 
-            // Magnitude attribute (location = 1): 1 float, offset 2 floats
+            // magnitude attribute: 1 float, offset 2 floats
             GL.VertexAttribPointer(1, 1, VertexAttribPointerType.Float, false, 3 * sizeof(float), 2 * sizeof(float));
             GL.EnableVertexAttribArray(1);
 
